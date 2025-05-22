@@ -13,6 +13,10 @@
 #define PROP_SIGNAL_MIN 51
 #define PROP_SIGNAL_ZERO 77
 
+#define MAX_PROP_FACTOR 25
+#define L_PROP_FACTOR 25
+#define R_PROP_FACTOR 25
+
 class UsvServerCallbacks : public BLEServerCallbacks
 {
     void onConnect(BLEServer *pServer)
@@ -33,14 +37,16 @@ class ControlCallbacks : public BLECharacteristicCallbacks
 {
     void onWrite(BLECharacteristic *pCharacteristic)
     {
+        bool isLProp = pCharacteristic->getUUID().toString() == L_PROP_CHARACTERISTIC_UUID;
+
         // Convert the received characteristic value to prop value.
         String strValue = pCharacteristic->getValue();
         size_t length = strValue.length();
 
         int8_t receivedInt8 = static_cast<int8_t>(strValue.charAt(0));
-        long escSignal = map(receivedInt8, -5, 5, PROP_SIGNAL_MIN, PROP_SIGNAL_MAX);
+        long escSignal = map(receivedInt8 * (isLProp ? L_PROP_FACTOR : R_PROP_FACTOR), -5 * MAX_PROP_FACTOR, 5 * MAX_PROP_FACTOR, PROP_SIGNAL_MIN, PROP_SIGNAL_MAX);
 
-        if (pCharacteristic->getUUID().toString() == L_PROP_CHARACTERISTIC_UUID) {
+        if (isLProp) {
             ledcWrite(L_PROP, escSignal);
         } else {
             ledcWrite(R_PROP, escSignal);
