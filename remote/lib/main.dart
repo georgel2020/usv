@@ -38,6 +38,9 @@ class BleController {
 
   late Timer _updateTimer;
 
+  final _connectionStateController = StreamController<BluetoothConnectionState>();
+  Stream<BluetoothConnectionState> get connectionState => _connectionStateController.stream;
+
   BleController({required this.deviceName});
 
   /// Connect to the USV.
@@ -58,9 +61,7 @@ class BleController {
     await FlutterBluePlus.startScan(timeout: Duration(seconds: 10));
     final Completer<BluetoothDevice> deviceCompleter = Completer<BluetoothDevice>();
     late StreamSubscription<List<ScanResult>> subscription;
-    subscription = FlutterBluePlus.onScanResults.listen((
-      List<ScanResult> results,
-    ) {
+    subscription = FlutterBluePlus.onScanResults.listen((List<ScanResult> results) {
       if (results.isNotEmpty) {
         for (ScanResult r in results) {
           if (r.advertisementData.advName == deviceName) {
@@ -85,8 +86,13 @@ class BleController {
       final characteristics = service.characteristics;
       _lPropCharacteristic = characteristics.firstWhere((c) => c.uuid == lPropCharacteristicUuid);
       _rPropCharacteristic = characteristics.firstWhere((c) => c.uuid == rPropCharacteristicUuid);
+
+      _device!.connectionState.listen((state) {
+        _connectionStateController.add(state);
+      });
     } catch (e) {
       logger.e("Error: $e. ");
+      _connectionStateController.add(BluetoothConnectionState.disconnected);
     }
   }
 
@@ -124,18 +130,60 @@ class _ControllerUIState extends State<ControllerUI> {
   double _leftValue = 0.0;
   double _rightValue = 0.0;
   late BleController _bleController;
+  bool _isConnected = false;
+  bool _isConnecting = false;
 
   @override
   void initState() {
     super.initState();
     _bleController = BleController(deviceName: "Untitled USV");
-    _bleController.connectToDevice();
+    
+    // If the connection is lost, update the connections state.
+    _bleController.connectionState.listen((state) {
+      if (state == BluetoothConnectionState.disconnected && mounted) {
+        setState(() {
+          _isConnected = false;
+          _isConnecting = false;
+        });
+      }
+    });
+    
+    _tryConnect();
   }
 
-  @override
-  void dispose() {
-    _bleController.disconnect();
-    super.dispose();
+  /// Try to connect to the USV.
+  /// 
+  /// The connection will be attempted for 10 seconds before the user can retry.
+  Future<void> _tryConnect() async {
+    setState(() {
+      _isConnecting = true;
+    });
+    
+    final timeoutTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted && _isConnecting) {
+        setState(() {
+          _isConnecting = false;
+        });
+      }
+    });
+
+    try {
+      await _bleController.connectToDevice();
+      if (mounted) {
+        setState(() {
+          _isConnected = true;
+          _isConnecting = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnecting = false;
+        });
+      }
+    } finally {
+      timeoutTimer.cancel();
+    }
   }
 
   @override
@@ -143,29 +191,42 @@ class _ControllerUIState extends State<ControllerUI> {
     return Scaffold(
       appBar: AppBar(title: const Text('Remote Control')),
       body: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            VerticalSlider(
-              value: _leftValue,
-              onChanged: (value) {
-                setState(() {
-                  _leftValue = value;
-                  _bleController.updateValues(_leftValue, _rightValue);
-                });
-              },
-            ),
-            VerticalSlider(
-              value: _rightValue,
-              onChanged: (value) {
-                setState(() {
-                  _rightValue = value;
-                  _bleController.updateValues(_leftValue, _rightValue);
-                });
-              },
-            ),
-          ],
-        ),
+        child:
+            _isConnected
+                ? Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    VerticalSlider(
+                      value: _leftValue,
+                      onChanged: (value) {
+                        setState(() {
+                          _leftValue = value;
+                          _bleController.updateValues(_leftValue, _rightValue);
+                        });
+                      },
+                    ),
+                    VerticalSlider(
+                      value: _rightValue,
+                      onChanged: (value) {
+                        setState(() {
+                          _rightValue = value;
+                          _bleController.updateValues(_leftValue, _rightValue);
+                        });
+                      },
+                    ),
+                  ],
+                )
+                : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _isConnecting ? null : _tryConnect,
+                      child: Text('Connect'),
+                    ),
+                  ],
+                ),
       ),
     );
   }
