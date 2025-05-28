@@ -4,5 +4,8 @@
     "board": "esp32:esp32:esp32",
     "programmer": "esptool",
     "sketch": "vehicle\\vehicle.ino",
-    "output": ".\\vehicle\\build" 
+    "output": ".\\vehicle\\build",
+    "buildPreferences": [
+        ["build.extra_flags", "-DWIFI"]
+    ]
 }
