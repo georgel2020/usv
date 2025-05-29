@@ -41,6 +41,7 @@ struct MotorSpeeds {
   int16_t lPropValue;
   int16_t rPropValue;
 } __attribute__((packed));
+static unsigned long lastWifiDataTime = 0;
 #endif
 
 #ifdef BLUETOOTH
@@ -151,6 +152,18 @@ void loop()
         Serial.print(lPropPwm);
         Serial.print(", Motor 2 PWM: ");
         Serial.println(rPropPwm);
+
+        lastWifiDataTime = millis();
     }
+
+    // Stop propellers if no data received for 3 seconds.
+    if (millis() - lastWifiDataTime > 3000)
+    {
+        ledcWrite(L_PROP, PROP_SIGNAL_ZERO);
+        ledcWrite(R_PROP, PROP_SIGNAL_ZERO);
+        Serial.println("No data received for 3 seconds. Stopping propellers. ");
+    }
+
+    delay(10);
 #endif
 }

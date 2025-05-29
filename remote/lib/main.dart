@@ -346,14 +346,21 @@ class WifiController {
   /// Bind to any available port.
   void initUdpSender() async {
     _udpSender = await UDP.bind(Endpoint.any());
+    
+    // Send values periodically.
+    _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      updateValues(_lastLeft, _lastRight);
+    });
     logger.i('Connected to WiFi device. ');
   }
 
+  double _lastLeft = 0.0;
+  double _lastRight = 0.0;
+  Timer? _updateTimer;
+
   Future<void> updateValues(double left, double right) async {
-    if (_udpSender == null) {
-      logger.e('UDP sender not initialized. ');
-      return;
-    }
+    _lastLeft = left;
+    _lastRight = right;
 
     int lPropValue = left.toInt();
     int rPropValue = right.toInt();
@@ -381,6 +388,7 @@ class WifiController {
   /// Call this function on disposition.
   void disconnect() {
     _udpSender?.close();
+    _updateTimer?.cancel();
   }
 }
 
