@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -187,6 +188,7 @@ class _ControllerUIState extends State<ControllerUI> {
                       value: _leftValue,
                       maxValue: (widget.controlMode == ControlMode.bluetooth) ? 5 : 100,
                       divisions: (widget.controlMode == ControlMode.bluetooth) ? 10 : 50,
+                      isReversed: true,
                       onChanged: (value) {
                         if (widget.controlMode == ControlMode.bluetooth) {
                           setState(() {
@@ -205,6 +207,7 @@ class _ControllerUIState extends State<ControllerUI> {
                       value: _rightValue,
                       maxValue: (widget.controlMode == ControlMode.bluetooth) ? 5 : 100,
                       divisions: (widget.controlMode == ControlMode.bluetooth) ? 10 : 50,
+                      isReversed: false,
                       onChanged: (value) {
                         if (widget.controlMode == ControlMode.bluetooth) {
                           setState(() {
@@ -396,6 +399,7 @@ class VerticalSlider extends StatelessWidget {
   final double value;
   final double maxValue;
   final int divisions;
+  final bool isReversed;
   final Function(double) onChanged;
 
   const VerticalSlider({
@@ -403,6 +407,7 @@ class VerticalSlider extends StatelessWidget {
     required this.value,
     required this.maxValue,
     required this.divisions,
+    required this.isReversed,
     required this.onChanged,
   });
 
@@ -413,17 +418,20 @@ class VerticalSlider extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          RotatedBox(
-            quarterTurns: -1,
-            child: Slider(
-              min: -maxValue,
-              max: maxValue,
-              divisions: divisions,
-              label: null,
-              value: value,
-              onChanged: onChanged,
+          Transform.flip(
+            flipX: true,
+            child: RotatedBox(
+              quarterTurns: -1,
+              child: Slider(
+                min: -maxValue,
+                max: maxValue,
+                divisions: divisions,
+                label: value.toInt().toString(),
+                value: value,
+                onChanged: onChanged,
+              ),
             ),
-          ),
+          )
         ],
       ),
     );
